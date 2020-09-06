@@ -1,0 +1,116 @@
+apply plugin: 'com.android.application'
+import com.google.gson.Gson
+
+import java.text.SimpleDateFormat
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+apply from: '../config/pack.gradle'
+def versionDescription = "versionDescription"
+android {
+    compileSdkVersion 29
+    buildToolsVersion "29.0.3"
+    defaultConfig {
+        applicationId "com.jason.myapp"
+        minSdkVersion 17
+        targetSdkVersion 29
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test:runner:1.2.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+}
+
+this.gradle.buildFinished {
+    def runTasks = gradle.getStartParameter().taskNames
+    android.applicationVariants.all { variant ->
+        variant.outputs.all {
+            if ('release'.equals(variant.buildType.name)) {
+                def flavorName = variant.productFlavors[0].name
+                def verName = variant.versionName
+                def fileName = "app-TemperatureMeasureBaseVersion" + "-" + flavorName + "-" + variant.buildType.name + "-" + verName + ".apk"
+                def path = "${buildDir}/../${flavorName}/release/"
+                def taskname = ":myapp:assemble${flavorName.capitalize()}Release"
+                runTasks.each { info ->
+                    if (info == taskname) {
+                        createVersionFile(new AppVersion(verName, variant.versionCode, fileName, versionDescription), variant.applicationId, path)
+                        zipFiles(new File(new File(path + fileName).absolutePath), new File(new File(path + variant.applicationId + ".zip").absolutePath))
+                    }
+                }
+            }
+        }
+    }
+}
+def createVersionFile(AppVersion appVersion, String localApplicationId, String workfolder) {
+    def apkFile = new File("$workfolder" + appVersion.apkName)
+    if (apkFile.exists()) {
+        appVersion.fileLength = apkFile.length()
+    }
+    appVersion.setBuildTime(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+    def versionJsonFile = new File("$workfolder${localApplicationId}.json")
+    if (versionJsonFile.exists()) {
+        versionJsonFile.delete()
+    }
+    versionJsonFile.createNewFile()
+    def out = new BufferedWriter(new FileWriter(versionJsonFile))
+    out.write(new Gson().toJson(appVersion))
+    out.close()
+}
+
+static void zipFiles(File srcFiles, File zipFile) {
+    if (!zipFile.exists()){ zipFile.createNewFile()}
+    FileOutputStream fileOutputStream = new FileOutputStream(zipFile)
+    ZipOutputStream zipOutputStream = new ZipOutputStream(fileOutputStream)
+    FileInputStream fileInputStream = new FileInputStream(srcFiles)
+    ZipEntry zipEntry = new ZipEntry(srcFiles.getName())
+    zipOutputStream.putNextEntry(zipEntry)
+    int len
+    byte[] buffer = new byte[1024]
+    while ((len = fileInputStream.read(buffer)) > 0) {
+        zipOutputStream.write(buffer, 0, len)
+    }
+    zipOutputStream.closeEntry()
+    zipOutputStream.close()
+    fileInputStream.close()
+    fileOutputStream.close()
+}
+
+class AppVersion {
+    def versionName
+    def versionCode
+    def apkName
+    def versionDescription
+    def fileLength
+    def buildTime
+
+    AppVersion(
+            def versionName,
+            def versionCode,
+            def apkName,
+            def versionDescription) {
+        this.versionName = versionName
+        this.versionCode = versionCode
+        this.apkName = apkName
+        this.versionDescription = versionDescription
+        this.fileLength = fileLength
+    }
+}
+
+
+

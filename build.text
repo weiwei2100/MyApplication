@@ -1,0 +1,379 @@
+apply plugin: 'com.android.application'
+import com.google.gson.Gson
+
+import java.text.SimpleDateFormat
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+
+def getDate = { ->
+    def date = new Date()
+    def formattedDate = date.format('yyyyMMdd')
+    return formattedDate
+}
+
+def versionDescription = "versionDescription"
+
+def apkInfos = new ArrayList<ApkInfo>();
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion "29.0.3"
+
+    defaultConfig {
+        applicationId "com.jason.myapp"
+        minSdkVersion 17
+        targetSdkVersion 29
+//        versionCode 1
+//        versionName "${getDate}-1.0."
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    flavorDimensions 'wang'
+    productFlavors {
+        base {
+            dimension 'wang'
+            applicationId "com.jason.base"
+            versionCode 1
+            versionName "${getDate}-1.1."
+            //manifestPlaceholders = [UMENG_CHANNEL_VALUE: name]
+            //resValue "string", "app_name", "BASE"
+            manifestPlaceholders = [app_name: "BASE", icon: "@mipmap/ic_launcher_round"]
+            //ndk{
+            //      abiFilters "arm64-v8a"
+            //}
+        }
+        form {
+            dimension 'wang'
+            applicationId "com.jason.form"
+            versionCode 1
+            versionName "${getDate}-1.2."
+            //manifestPlaceholders = [UMENG_CHANNEL_VALUE: name]
+            //resValue "string", "app_name", "FORM"
+            manifestPlaceholders = [app_name: "FORM", icon: "@mipmap/ic_launcher_round"]
+        }
+
+    }
+    productFlavors.all {
+        flavor -> manifestPlaceholders = [UMENG_CHANNEL_VALUE: name]
+    }
+    def versionPropsFile = file('version.properties')
+    if (versionPropsFile.canRead()) {
+        Properties versionProps = new Properties()
+        versionProps.load(new FileInputStream(versionPropsFile))
+        def formVerCode = versionProps["VERSION_CODE_form"].toInteger()
+        def baseVerCode = versionProps["VERSION_CODE_base"].toInteger()
+        productFlavors.all { flavor ->
+            if (flavor.name.equals("base")) {
+                productFlavors.base.versionCode = (++baseVerCode)
+                productFlavors.base.versionName = flavor.versionName + String.valueOf(baseVerCode)
+
+            }else if (flavor.name.equals("form")) {
+                productFlavors.form.versionCode = (++formVerCode)
+                productFlavors.form.versionName = flavor.versionName + String.valueOf(formVerCode)
+            }
+        }
+        def runTasks = gradle.getStartParameter().taskNames
+        if (':myapp:assembleFormRelease' in runTasks | ':myapp:assembleBaseRelease' in runTasks) {
+            versionProps["VERSION_CODE_base"] = String.valueOf(baseVerCode)
+            versionProps["VERSION_CODE_form"] = String.valueOf(formVerCode)
+            versionProps.store(versionPropsFile.newWriter(), null)
+        }
+
+    } else {
+        throw new GradleException("Could not read version.properties!")
+    }
+    apkInfos = new ArrayList<ApkInfo>()
+    android.applicationVariants.all { variant ->
+        println variant.name
+        variant.outputs.all {
+            if (outputFileName.endsWith(".apk")) {
+                if ('release'.equals(variant.buildType.name)) {
+
+
+
+
+//                    def appName = "app-TemperatureMeasureBaseVersion"
+//                    def flavorName = variant.productFlavors[0].name
+//                    //def flavorName = variant.name //formRelease 如果没有 添加 productFlavors 输出是Release
+//                    def apkType = variant.buildType.name
+//                    def verName = variant.versionName
+//                    def fileName = appName + "-" + flavorName + "-" + apkType + "-" + verName + ".apk"
+//                    outputFileName = fileName
+
+
+                    def appid = variant.productFlavors[0].applicationId
+                    def flavorName = variant.productFlavors[0].name
+                    def  versionName = variant.versionName
+                    def versionCode = variant.versionCode
+                    def apkfilename = "app-TemperatureMeasureBaseVersion-${flavorName}-${variant.buildType.name}-${versionName}.apk"
+                    //"./"：代表目前所在的目录。
+                    //
+                    //" . ./"代表上一层目录。
+                    //
+                    //"/"：代表根目录。
+                    def workfolder = "${buildDir}/../${flavorName}/release/"
+                    def    apkfile = "${workfolder}$apkfilename"
+                    println "wangdong:"+
+                            appid +"|"+
+                            flavorName +"|"+
+                            versionName +"|"+
+                            versionCode +"|"+
+                            apkfilename +"|"+
+                            workfolder +"|"+
+                            apkfile
+                    apkInfos.add(new ApkInfo(versionName,
+                            versionCode,
+                            flavorName,
+                            apkfilename,
+                            workfolder,
+                            apkfile,
+                            appid))
+
+                    outputFileName = apkfilename
+                }
+            }
+        }
+        if(apkInfos!=null){
+            println  "jiesu"+apkInfos.size()
+
+        }
+
+    }
+
+
+
+    task packageDistribution(type: Zip) {
+        println "dong"
+//    if(apkInfos!=null){
+        println "hehe"+apkInfos.size()
+
+        for(ApkInfo apkinfo:apkInfos) {
+
+            println apkInfos.get(0).apkfile
+            boolean isexist = new File(apkinfo.apkfile).exists()
+            println "${isexist}"
+            if(isexist){
+                archiveFileName = "${apkinfo.appid}.zip"
+                destinationDirectory = file(apkinfo.workfolder)
+                from apkinfo.apkfile
+                createVersionFile(new AppVersion(apkinfo.versionName, apkinfo.versionCode, apkinfo.apkfilename, versionDescription), apkinfo.appid, apkinfo.workfolder)
+            }
+        }
+
+//    }
+//        def ii = 1;
+//        ++ii
+//        archiveFileName = "${apkInfos}.zip"
+//        destinationDirectory = file("D:\\MyApplication\\myapp\\build/../base/release/")
+//        from "D:\\MyApplication\\myapp\\build/../base/release/app-TemperatureMeasureBaseVersion-base-release-20200809-1.1.30.apk"
+//        doLast{
+//            println "xdong"
+//            println "hehe"+apkInfos.size()
+//
+//        }
+
+//    android.applicationVariants.all { variant ->
+//        println "xiao"+variant.name
+//        if (variant.buildType.name.equals('release')) {
+//            variant.productFlavors.each { flavor ->
+//
+//                }
+//            }
+//        }
+    }
+}
+
+
+
+
+
+def createVersionFile(AppVersion appVersion, String localApplicationId, String workfolder) {
+    def apkFile = new File("$workfolder" + appVersion.apkName)
+    if (apkFile.exists()) {
+        appVersion.fileLength = apkFile.length()
+    }
+    appVersion.setBuildTime(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+    def versionJsonFile = new File("$workfolder${localApplicationId}.json")
+    println "version json file: $workfolder${localApplicationId}.json"
+    if (versionJsonFile.exists()) {
+        versionJsonFile.delete()
+    }
+    versionJsonFile.createNewFile()
+    def out = new BufferedWriter(new FileWriter(versionJsonFile))
+    out.write(new Gson().toJson(appVersion))
+    out.close()
+}
+// task packageDistribution(type: Zip) {
+//    def versionName
+//    def versionCode
+//    def flavorName
+//    def apkfilename
+//    def workfolder
+//    def apkfile
+//    def appid
+//    android.applicationVariants.each { variant ->
+//        println "xiao"+variant.name
+//        if (variant.buildType.name.equals('release')) {
+//            variant.productFlavors.each { flavor ->
+//                println "wangdong:"+flavor.name
+//                appid = flavor.applicationId
+//                flavorName = flavor.name
+//                versionName = variant.versionName
+//                versionCode = variant.versionCode
+//                apkfilename = "app-TemperatureMeasureBaseVersion-${flavorName}-${variant.buildType.name}-${versionName}.apk"
+//                //"./"：代表目前所在的目录。
+//                //
+//                //" . ./"代表上一层目录。
+//                //
+//                //"/"：代表根目录。
+//                workfolder = "${buildDir}/../${flavorName}/release/"
+//                apkfile = "${workfolder}$apkfilename"
+//                boolean isexist = new File(apkfile).exists()
+//                println "${isexist}"
+//                if(isexist){
+//
+//                    archiveFileName = "${flavor.applicationId}.zip"
+//                    destinationDirectory = file(workfolder)
+//                    from apkfile
+//                    createVersionFile(new AppVersion(versionName, versionCode, apkfilename, versionDescription), appid, workfolder)
+//                }
+//
+//            }
+//        }
+//    }
+//}
+
+
+//tasks.whenTaskAdded { task ->
+//    android.applicationVariants.all { variant ->
+//        if (variant.buildType.name.equals('release')) {
+//            variant.productFlavors.each { flavor ->
+//                def taskSuffix = variant.name.capitalize()
+//                def assembleTaskName = "assemble${taskSuffix}"
+//                if (tasks.findByName(assembleTaskName)) {
+//                    if (task.name == assembleTaskName) {
+//                        task.finalizedBy 'packageDistribution'
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+tasks.whenTaskAdded { task ->
+    //println "wangdong"+task.name
+
+
+            if (task.name.equals('packageFormRelease')) {//访问当前任务
+                task.finalizedBy 'packageDistribution'  //当前任务结束后立马执行
+            }else if (task.name.equals('packageBaseRelease')) {
+                task.finalizedBy 'packageDistribution'
+            }
+
+
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test:runner:1.2.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+}
+//def versionDescription = "versionDescription"
+//def createVersionFile(AppVersion appVersion, String localApplicationId, String workfolder) {
+//    def apkFile = new File("$workfolder" + appVersion.apkName)
+//    if (apkFile.exists()) {
+//        appVersion.fileLength = apkFile.length()
+//    }
+//    appVersion.setBuildTime(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()))
+//    def versionJsonFile = new File("$workfolder${localApplicationId}.json")
+//    println "version json file: $workfolder${localApplicationId}.json"
+//    if (versionJsonFile.exists()) {
+//        versionJsonFile.delete()
+//    }
+//    versionJsonFile.createNewFile()
+//    def out = new BufferedWriter(new FileWriter(versionJsonFile))
+//    out.write(new Gson().toJson(appVersion))
+//    out.close()
+//}
+
+class AppVersion {
+
+    String versionName
+    int versionCode
+    String apkName
+    String versionDescription
+    long fileLength
+    String buildTime
+
+    AppVersion(String versionName, int versionCode, String apkName, String versionDescription) {
+        this.versionName = versionName
+        this.versionCode = versionCode
+        this.apkName = apkName
+        this.versionDescription = versionDescription
+        this.fileLength = fileLength
+    }
+}
+class ApkInfo{
+
+    def versionName
+    def versionCode
+    def flavorName
+    def apkfilename
+    def workfolder
+    def apkfile
+    def appid
+
+    ApkInfo( versionName,
+             versionCode,
+             flavorName,
+             apkfilename,
+             workfolder,
+             apkfile,
+             appid){
+        this.versionCode=versionName
+        this.versionCode=versionCode
+        this.flavorName=flavorName
+        this.apkfilename=apkfilename
+        this.workfolder=workfolder
+        this.apkfile=apkfile
+        this.appid=appid
+    }
+}
+
+
+
+def getCurrentFlavor() {
+    Gradle gradle = getGradle()
+    String taskReqStr = gradle.getStartParameter().getTaskRequests().toString()
+    Pattern pattern
+    if (taskReqStr.contains("assemble")) {
+        pattern = Pattern.compile("assemble(\\w+)(Release|Debug)")
+    } else {
+        pattern = Pattern.compile("generate(\\w+)(Release|Debug)")
+    }
+    Matcher matcher = pattern.matcher(taskReqStr)
+    if (matcher.find()) {
+        String flavor = matcher.group(1).uncapitalize()
+        println "getCurrentFlavor:" + flavor
+        return flavor
+    } else {
+        println "getCurrentFlavor:cannot_find_current_flavor"
+        return ""
+    }
+}
+//this.gradle.buildFinished {
+// createVersionFile(new AppVersion(variant.versionName+variant.defaultConfig.versionCode,variant.defaultConfig.versionCode,outputFileName,versionDescription),android.defaultConfig.applicationId)
+//}
