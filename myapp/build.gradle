@@ -35,6 +35,23 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+    //权限申请
+    implementation 'com.tbruyelle.rxpermissions2:rxpermissions:0.9.5@aar'
+    //网络请求
+    implementation 'com.squareup.okhttp3:okhttp:3.11.0'
+    implementation 'com.squareup.retrofit2:retrofit:2.4.0'
+    //ConverterFactory的Gson依赖包
+    implementation 'com.squareup.retrofit2:converter-gson:2.4.0'
+    //CallAdapterFactory的Rx依赖包
+    implementation 'com.squareup.retrofit2:adapter-rxjava2:2.4.0'
+
+    implementation 'io.reactivex.rxjava2:rxandroid:2.0.2'
+    //日志
+    implementation 'com.squareup.okhttp3:logging-interceptor:3.10.0'
+    //日志
+    implementation 'com.orhanobut:logger:2.2.0'
+    //工具类
+    implementation 'com.blankj:utilcode:1.23.7'
 }
 
 this.gradle.buildFinished {
@@ -57,6 +74,7 @@ this.gradle.buildFinished {
         }
     }
 }
+
 def createVersionFile(AppVersion appVersion, String localApplicationId, String workfolder) {
     def apkFile = new File("$workfolder" + appVersion.apkName)
     if (apkFile.exists()) {
@@ -74,7 +92,9 @@ def createVersionFile(AppVersion appVersion, String localApplicationId, String w
 }
 
 static void zipFiles(File srcFiles, File zipFile) {
-    if (!zipFile.exists()){ zipFile.createNewFile()}
+    if (!zipFile.exists()) {
+        zipFile.createNewFile()
+    }
     FileOutputStream fileOutputStream = new FileOutputStream(zipFile)
     ZipOutputStream zipOutputStream = new ZipOutputStream(fileOutputStream)
     FileInputStream fileInputStream = new FileInputStream(srcFiles)
@@ -111,6 +131,3 @@ class AppVersion {
         this.fileLength = fileLength
     }
 }
-
-
-
